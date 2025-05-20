@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: my-node-api
+    name: truth-dare-server
     runtime: node
     plan: free
     branch: main
