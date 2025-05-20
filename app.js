@@ -18,7 +18,10 @@ let currentTurnIndex = 0;
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: [
+      "http://localhost:3000",
+      "https://truth-or-dare-game-delta.vercel.app",
+    ],
     methods: ["GET", "POST"],
     allowedHeaders: ["Content-Type"],
     credentials: true,
@@ -30,7 +33,15 @@ mongoose
   .then(() => console.log("MongoDB Connected"))
   .catch((err) => console.error(err));
 
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://truth-or-dare-game-delta.vercel.app",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.use("/api/players", playerRoutes);
@@ -41,17 +52,17 @@ io.on("connection", (socket) => {
   console.log(`New connection: ${socket.id}`);
 
   // Player joining handler
-   socket.on("join", (player) => {
+  socket.on("join", (player) => {
     const newPlayer = {
       ...player,
       socketId: socket.id,
-      isTurn: false
+      isTurn: false,
     };
 
     // Add to players order if new player
-    if (!playersOrder.some(p => p.socketId === socket.id)) {
+    if (!playersOrder.some((p) => p.socketId === socket.id)) {
       playersOrder.push(newPlayer);
-      
+
       // Set first player's turn
       if (playersOrder.length === 1) {
         playersOrder[0].isTurn = true;
@@ -78,11 +89,14 @@ io.on("connection", (socket) => {
       ]);
 
       if (questions.length > 0) {
-        io.emit("newMessage", { 
-          playerName: "Question", 
-          content: `${type.toUpperCase()}: ${questions[0].text} (${category})` 
+        io.emit("newMessage", {
+          playerName: "Question",
+          content: `${type.toUpperCase()}: ${questions[0].text} (${category})`,
         });
-        socket.emit("newQuestion", { choice: type, question: questions[0].text });
+        socket.emit("newQuestion", {
+          choice: type,
+          question: questions[0].text,
+        });
       } else {
         socket.emit("error", `No ${type} questions in ${category}`);
       }
@@ -93,7 +107,7 @@ io.on("connection", (socket) => {
   });
 
   // Turn progression
-   const advanceTurn = () => {
+  const advanceTurn = () => {
     currentTurnIndex = (currentTurnIndex + 1) % playersOrder.length;
     playersOrder.forEach((p, index) => {
       p.isTurn = index === currentTurnIndex;
@@ -103,24 +117,24 @@ io.on("connection", (socket) => {
   };
 
   // Answer submission
- socket.on("done", ({ answer, playerName }) => {
-  // Broadcast the answer to all players
-  io.emit("newMessage", { 
-    playerName, 
-    content: answer 
+  socket.on("done", ({ answer, playerName }) => {
+    // Broadcast the answer to all players
+    io.emit("newMessage", {
+      playerName,
+      content: answer,
+    });
+    advanceTurn();
   });
-  advanceTurn();
-});
 
   // Disconnection handler
-socket.on("disconnect", () => {
-    playersOrder = playersOrder.filter(p => p.socketId !== socket.id);
-    
+  socket.on("disconnect", () => {
+    playersOrder = playersOrder.filter((p) => p.socketId !== socket.id);
+
     if (playersOrder.length > 0) {
       currentTurnIndex = currentTurnIndex % playersOrder.length;
       advanceTurn();
     }
-    
+
     io.emit("updatePlayers", playersOrder);
   });
 
